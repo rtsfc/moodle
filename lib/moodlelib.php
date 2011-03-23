@@ -7044,6 +7044,19 @@ function get_plugin_types($fullpaths=true) {
 
         // local is always last!
         $info['local'] = 'local';
+        $locals = get_plugin_list('local');
+        if(!empty($locals)) {
+            foreach($locals as $local => $localdir) {
+	            if (file_exists("$localdir/db/subplugins.php")) {
+	                $subplugins = array();
+	                include("$localdir/db/subplugins.php");
+	                foreach ($subplugins as $subtype=>$dir) {
+	                    $info[$subtype] = $dir;
+	                }
+	            }
+                
+            }
+        }
 
         $fullinfo = array();
         foreach ($info as $type => $dir) {
@@ -7081,6 +7094,9 @@ function get_plugin_list($plugintype) {
         // mod is an exception because we have to call this function from get_plugin_types()
         $fulldirs[] = $CFG->dirroot.'/mod';
 
+    } else if ($plugintype === 'local') {
+        // Same with local
+        $fulldirs[] = $CFG->dirroot.'/local';
     } else if ($plugintype === 'theme') {
         $fulldirs[] = $CFG->dirroot.'/theme';
         // themes are special because they may be stored also in separate directory
