@@ -778,12 +778,15 @@ class auth_plugin_ldap extends auth_plugin_base {
                 print_string('userentriestoupdate', 'auth_ldap', count($users));
 
                 $sitecontext = get_context_instance(CONTEXT_SYSTEM);
-                if (!empty($this->config->creators) and !empty($this->config->memberattribute)
-                  and $roles = get_archetype_roles('coursecreator')) {
-                    $creatorrole = array_shift($roles);      // We can only use one, let's use the first one
-                } else {
-                    $creatorrole = false;
+                $roles = array();
+                for ($i=1,$j=3; $i<=$j; $i++) {
+                    $role = 'role'.$i;
+                    $rolecontext = 'role'.$i;
+                    if (!empty($this->config->$role) && !empty($this->config->$rolecontext)) {
+                        $roles[$i] = $DB->get_record('role', array('id' => $this->config->$role));
+                    }
                 }
+                $roles = array_filter($roles);
 
                 $transaction = $DB->start_delegated_transaction();
                 $xcount = 0;
@@ -798,11 +801,13 @@ class auth_plugin_ldap extends auth_plugin_base {
                     $xcount++;
 
                     // Update course creators if needed
-                    if ($creatorrole !== false) {
-                        if ($this->iscreator($user->username)) {
-                            role_assign($creatorrole->id, $user->id, $sitecontext->id, $this->roleauth);
-                        } else {
-                            role_unassign($creatorrole->id, $user->id, $sitecontext->id, $this->roleauth);
+                    if (!empty($roles)) {
+                        foreach ($roles as $key => $role) {
+                            if ($this->isrole($user->username, $key)) {
+                                role_assign($role->id, $user->id, $sitecontext->id, $this->roleauth);
+                            } else {
+                                role_unassign($role->id, $user->id, $sitecontext->id, $this->roleauth);
+                            }
                         }
                     }
                 }
@@ -827,13 +832,15 @@ class auth_plugin_ldap extends auth_plugin_base {
             print_string('userentriestoadd', 'auth_ldap', count($add_users));
 
             $sitecontext = get_context_instance(CONTEXT_SYSTEM);
-            if (!empty($this->config->creators) and !empty($this->config->memberattribute)
-              and $roles = get_archetype_roles('coursecreator')) {
-                $creatorrole = array_shift($roles);      // We can only use one, let's use the first one
-            } else {
-                $creatorrole = false;
+            $roles = array();
+            for ($i=1,$j=3; $i<=$j; $i++) {
+                $role = 'role'.$i;
+                $rolecontext = 'role'.$i;
+                if (!empty($this->config->$role) && !empty($this->config->$rolecontext)) {
+                    $roles[$i] = $DB->get_record('role', array('id' => $this->config->$role));
+                }
             }
-
+            $roles = array_filter($roles);
             $transaction = $DB->start_delegated_transaction();
             foreach ($add_users as $user) {
                 $user = $this->get_userinfo_asobj($user->username);
@@ -856,9 +863,13 @@ class auth_plugin_ldap extends auth_plugin_base {
                     set_user_preference('auth_forcepasswordchange', 1, $id);
                 }
 
-                // Add course creators if needed
-                if ($creatorrole !== false and $this->iscreator($user->username)) {
-                    role_assign($creatorrole->id, $id, $sitecontext->id, $this->roleauth);
+                // Add roles if needed
+                if (!empty($roles)) {
+                    foreach ($roles as $key => $role) {
+                        if ($this->isrole($user->username, $key)) {
+                            role_assign($role->id, $id, $sitecontext->id, $this->roleauth);
+                        }
+                    }
                 }
 
             }
@@ -993,8 +1004,10 @@ class auth_plugin_ldap extends auth_plugin_base {
      * @param mixed $username    username (without system magic quotes)
      * @return mixed result      null if course creators is not configured, boolean otherwise.
      */
-    function iscreator($username) {
-        if (empty($this->config->creators) or empty($this->config->memberattribute)) {
+    function isrole($username, $num) {
+        $role = 'role'.$num;
+        $rolecontext = 'role'.$num.'_context';
+        if (empty($this->config->$role) or empty($this->config->$rolecontext) or empty($this->config->memberattribute)) {
             return null;
         }
 
@@ -1011,12 +1024,12 @@ class auth_plugin_ldap extends auth_plugin_base {
             $userid = $extusername;
         }
 
-        $group_dns = explode(';', $this->config->creators);
-        $creator = ldap_isgroupmember($ldapconnection, $userid, $group_dns, $this->config->memberattribute);
+        $group_dns = explode(';', $this->config->$rolecontext);
+        $isrole = ldap_isgroupmember($ldapconnection, $userid, $group_dns, $this->config->memberattribute);
 
         $this->ldap_close();
 
-        return $creator;
+        return $isrole;
     }
 
     /**
@@ -1654,20 +1667,22 @@ class auth_plugin_ldap extends auth_plugin_base {
      * @param $user object user object (without system magic quotes)
      */
     function sync_roles($user) {
-        $iscreator = $this->iscreator($user->username);
-        if ($iscreator === null) {
-            return; // Nothing to sync - creators not configured
-        }
+        global $DB;
+        for ($i=1,$j=3; $i<=$j; $i++) {
+            $role = 'role'.$i;
+            $isrole = $this->isrole($user->username, $i);
+            if ($isrole === null) {
+                continue; // Nothing to sync - creators not configured
+            }
+            if ($rolerecord = $DB->get_record('role', array('id' => $this->config->$role))) {
+                $systemcontext = get_context_instance(CONTEXT_SYSTEM);
 
-        if ($roles = get_archetype_roles('coursecreator')) {
-            $creatorrole = array_shift($roles);      // We can only use one, let's use the first one
-            $systemcontext = get_context_instance(CONTEXT_SYSTEM);
-
-            if ($iscreator) { // Following calls will not create duplicates
-                role_assign($creatorrole->id, $user->id, $systemcontext->id, $this->roleauth);
-            } else {
-                // Unassign only if previously assigned by this plugin!
-                role_unassign($creatorrole->id, $user->id, $systemcontext->id, $this->roleauth);
+                if ($isrole) { // Following calls will not create duplicates
+                    role_assign($rolerecord->id, $user->id, $systemcontext->id, $this->roleauth);
+                } else {
+                    // Unassign only if previously assigned by this plugin!
+                    role_unassign($rolerecord->id, $user->id, $systemcontext->id, $this->roleauth);
+                }
             }
         }
     }
@@ -1738,8 +1753,23 @@ class auth_plugin_ldap extends auth_plugin_base {
         if (!isset($config->memberattribute_isdn)) {
             $config->memberattribute_isdn = '';
         }
-        if (!isset($config->creators)) {
-            $config->creators = '';
+        if (!isset($config->role1)) {
+            $config->role1 = null;
+        }
+        if (!isset($config->role1_context)) {
+            $config->role1_context = '';
+        }
+        if (!isset($config->role2)) {
+            $config->role2 = null;
+        }
+        if (!isset($config->role2_context)) {
+            $config->role2_context = '';
+        }
+        if (!isset($config->role3)) {
+            $config->role3 = null;
+        }
+        if (!isset($config->role3_context)) {
+            $config->role3_context = '';
         }
         if (!isset($config->create_context)) {
             $config->create_context = '';
@@ -1805,7 +1835,12 @@ class auth_plugin_ldap extends auth_plugin_base {
         set_config('objectclass', trim($config->objectclass), $this->pluginconfig);
         set_config('memberattribute', moodle_strtolower(trim($config->memberattribute)), $this->pluginconfig);
         set_config('memberattribute_isdn', $config->memberattribute_isdn, $this->pluginconfig);
-        set_config('creators', trim($config->creators), $this->pluginconfig);
+        set_config('role1', $config->role1, $this->pluginconfig);
+        set_config('role1_context', $config->role1_context, $this->pluginconfig);
+        set_config('role2', $config->role2, $this->pluginconfig);
+        set_config('role2_context', $config->role2_context, $this->pluginconfig);
+        set_config('role3', $config->role3, $this->pluginconfig);
+        set_config('role3_context', $config->role3_context, $this->pluginconfig);
         set_config('create_context', trim($config->create_context), $this->pluginconfig);
         set_config('expiration', $config->expiration, $this->pluginconfig);
         set_config('expiration_warning', trim($config->expiration_warning), $this->pluginconfig);
