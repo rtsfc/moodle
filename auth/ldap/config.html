@@ -43,8 +43,23 @@ if (!isset($config->memberattribute)) {
 if (!isset($config->memberattribute_isdn)) {
     $config->memberattribute_isdn = '';
 }
-if (!isset($config->creators)) {
-    $config->creators = '';
+if (!isset($config->role1)) {
+    $config->role1 = '';
+}
+if (!isset($config->role1_context)) {
+    $config->role1_context = '';
+}
+if (!isset($config->role2)) {
+    $config->role2 = '';
+}
+if (!isset($config->role2_context)) {
+    $config->role2_context = '';
+}
+if (!isset($config->role3)) {
+    $config->role3 = '';
+}
+if (!isset($config->role3_context)) {
+    $config->role3_context = '';
 }
 if (!isset($config->create_context)) {
     $config->create_context = '';
@@ -96,6 +111,13 @@ if (!isset($config->ntlmsso_type)) {
 }
 
 $yesno = array(get_string('no'), get_string('yes'));
+
+global $DB;
+$rolesql = 'SELECT r.*
+    FROM {role} r JOIN {role_context_levels} rcl ON rcl.roleid = r.id
+    WHERE rcl.contextlevel = ?';
+$roles = $DB->get_records_sql_menu($rolesql, array(CONTEXT_SYSTEM));
+$roles = array('' => get_string('choosedots'))+$roles;
 
 ?>
 <table cellspacing="0" cellpadding="5" border="0">
@@ -448,19 +470,76 @@ $yesno = array(get_string('no'), get_string('yes'));
 </tr>
 <tr>
     <td colspan="2">
-        <h4><?php print_string('coursecreators') ?></h4>
+        <h4><?php print_string('roles'); ?></h4>
     </td>
 </tr>
 <tr valign="top" class="required">
     <td align="right">
-        <label for="creators"><?php print_string('auth_ldap_creators_key', 'auth_ldap') ?></label>
+        <?php echo html_writer::label(get_string('role1', 'auth_ldap'), 'role1'); ?>
     </td>
     <td>
-        <input name="creators" id="creators" type="text" size="30" value="<?php echo $config->creators?>" />
-        <?php if (isset($err['creators'])) { echo $OUTPUT->error_text($err['creators']); } ?>
+        <?php echo html_writer::select($roles, 'role1', $config->role1); ?>
+        <?php if (isset($err['role1'])) { echo $OUTPUT->error_text($err['role1']); } ?>
     </td>
     <td>
-        <?php print_string('auth_ldap_creators', 'auth_ldap') ?>
+    </td>
+</tr>
+<tr valign="top" class="required">
+    <td align="right">
+        <?php echo html_writer::label(get_string('role1_context', 'auth_ldap'), 'role1_context'); ?>
+    </td>
+    <td>
+        <?php echo html_writer::empty_tag('input', array('name' => 'role1_context', 'id' => 'role1_context', 'value' => $config->role1_context));?>
+        <?php if (isset($err['role1_context'])) { echo $OUTPUT->error_text($err['role1_context']); } ?>
+    </td>
+    <td>
+        <?php print_string('role_explain', 'auth_ldap'); ?>
+    </td>
+</tr>
+<tr valign="top" class="required">
+    <td align="right">
+        <?php echo html_writer::label(get_string('role2', 'auth_ldap'), 'role2');?>
+    </td>
+    <td>
+        <?php echo html_writer::select($roles, 'role2', $config->role2);?>
+        <?php if (isset($err['role2'])) { echo $OUTPUT->error_text($err['role2']); } ?>
+    </td>
+    <td>
+    </td>
+</tr>
+<tr valign="top" class="required">
+    <td align="right">
+        <?php echo html_writer::label(get_string('role2_context', 'auth_ldap'), 'role2_context');?>
+    </td>
+    <td>
+        <?php echo html_writer::empty_tag('input', array('name' => 'role2_context', 'id' => 'role2_context', 'value' => $config->role2_context));?>
+        <?php if (isset($err['role2_context'])) { echo $OUTPUT->error_text($err['role2_context']); } ?>
+    </td>
+    <td>
+        <?php print_string('role_explain', 'auth_ldap'); ?>
+    </td>
+</tr>
+<tr valign="top" class="required">
+    <td align="right">
+        <?php echo html_writer::label(get_string('role3', 'auth_ldap'), 'role3');?>
+    </td>
+    <td>
+        <?php echo html_writer::select($roles, 'role3', $config->role3);?>
+        <?php if (isset($err['role3'])) { echo $OUTPUT->error_text($err['role3']); } ?>
+    </td>
+    <td>
+    </td>
+</tr>
+<tr valign="top" class="required">
+    <td align="right">
+        <?php echo html_writer::label(get_string('role3_context', 'auth_ldap'), 'role3_context');?>
+    </td>
+    <td>
+        <?php echo html_writer::empty_tag('input', array('name' => 'role3_context', 'id' => 'role3_context', 'value' => $config->role3_context));?>
+        <?php if (isset($err['role3_context'])) { echo $OUTPUT->error_text($err['role3_context']); } ?>
+    </td>
+    <td>
+        <?php print_string('role_explain', 'auth_ldap') ?>
     </td>
 </tr>
 <tr>
