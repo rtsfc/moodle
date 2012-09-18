@@ -4796,7 +4796,9 @@ function email_to_user($user, $from, $subject, $messagetext, $messagehtml='', $a
 
     if ($mail->Send()) {
         set_send_count($user);
-        $mail->IsSMTP();                               // use SMTP directly
+        $mail->IsSMTP();     
+            $mailer->SMTPSecure="tls";
+        // use SMTP directly
         if (!empty($mail->SMTPDebug)) {
             echo '</pre>';
         }
